@@ -118,10 +118,13 @@ contract Vault is ReentrancyGuard, IVault {
     // poolAmounts tracks the number of received tokens that can be used for leverage
     // this is tracked separately from tokenBalances to exclude funds that are deposited as margin collateral
     // 收到可以用于杠杆的token数量（1->10倍杠杆，记录1），收到保证金数量
+    // 记录用户扣除费用后进行入池子中的代币数量，代币本位
     mapping (address => uint256) public override poolAmounts;
 
     // reservedAmounts tracks the number of tokens reserved for open leverage positions
     // 杠杆开仓需要保留的token数量(1->10倍杠杆，记录10)，10倍杠杆开仓，最终加上杠杆后开仓数量
+    // 记录未平仓杠杆头寸保留的代币数量，是加杠杆后的用户持仓总规模，**代币本位**
+    // 如用户1ETH做多5倍杠杆，则reservedAmounts[ETH].add(5);
     mapping (address => uint256) public override reservedAmounts;
 
     // bufferAmounts allows specification of an amount to exclude from swaps
@@ -137,9 +140,12 @@ contract Vault is ReentrancyGuard, IVault {
     // 当用户使用ETH，AVAX等非稳定币做保证金，开多仓时，
     // 该币种中对应的所有仓位position的position.size-position.collateral的差值的总和。
     // 即该币种的每一个仓位的头寸与仓位抵押品当前价值的差值的总和。以Usd计价。
+    // 具体逻辑细看
     mapping (address => uint256) public override guaranteedUsd;
 
     // cumulativeFundingRates tracks the funding rates based on utilization
+    // 记录当前系统的累计融资利率，每隔一定时间更新一次，现系统设置为每小时更新一次。
+    // 用户在加杠杆后，当减仓或清算时，会计算每个用户的融资费用，算作用户的成本。
     mapping (address => uint256) public override cumulativeFundingRates;
     // lastFundingTimes tracks the last time funding was updated for a token
     mapping (address => uint256) public override lastFundingTimes;
@@ -148,6 +154,8 @@ contract Vault is ReentrancyGuard, IVault {
     mapping (bytes32 => Position) public positions;
 
     // feeReserves tracks the amount of fees per token
+    // 在项目中调用合约函数时收取的手续费存入该变量中，代币本位
+    // 如用户加仓或购买GLP时，收取0.1ETH招待费费， feeReserves[ETH].add(0.1)
     mapping (address => uint256) public override feeReserves;
 
     mapping (address => uint256) public override globalShortSizes;
